@@ -25,9 +25,21 @@ This file captures what's been set up so far for Pingr MVP (as of the latest ses
   - OAuth consent screen configured
   - Web application credentials created
   - Authorized redirect URI: `https://pfwjifwfvimgdfehsrjq.supabase.co/auth/v1/callback`
+
+**`user_profiles` table (created via Supabase UI):**
+- `user_id uuid` — primary key, FK to `auth.users(id)` ON DELETE CASCADE (no default; always set to the authenticated user's ID)
+- `background text` — nullable
+- `goals text` — nullable
+- `tone text` — nullable
+- `roles text[]` — nullable
+- `industries text[]` — nullable
+- `emphasis text` — nullable
+- `created_at timestamptz` — not null, default `now()`
+- `updated_at timestamptz` — nullable, set to `now()` on every upsert in application code
+- **RLS enabled** with policy: `Users manage own profile` — `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`
+
 - Next planned Supabase tasks (not done yet):
-  - Create MVP tables: `user_profiles`, `prospects`, `drafts`
-  - Enable RLS and add policies to restrict rows to `auth.uid()`
+  - Create `prospects` and `drafts` tables with RLS
 
 ---
 
@@ -88,11 +100,11 @@ Note: `SUPABASE_SERVICE_ROLE_KEY` will be added later for server-only API endpoi
 **Protected page (test stub):**
 - `/protected` — shows logged-in user's email + Logout button
 - Used to verify end-to-end auth flow works
-- Will be replaced by the real app dashboard later
+- Can be deleted when `/app/prospects` is fully built out
 
 **Tested and confirmed working:**
-- Google OAuth login → lands on `/protected`
-- Email/password login → lands on `/protected`
+- Google OAuth login → profile check → lands on `/onboarding` or `/app/prospects`
+- Email/password login → profile check → lands on `/onboarding` or `/app/prospects`
 - Logout button → signs out and redirects to `/auth/login`
 - Unauthenticated access to any route → redirected to `/auth/login`
 
@@ -112,12 +124,43 @@ Note: `SUPABASE_SERVICE_ROLE_KEY` will be added later for server-only API endpoi
 
 ---
 
+### Onboarding + routing (complete and tested)
+
+**Post-login routing logic:**
+- After email login: queries `user_profiles` client-side immediately after `signInWithPassword` succeeds; redirects to `/app/prospects` if a profile row exists, `/onboarding` if not.
+- After Google OAuth: `auth/oauth/route.ts` queries `user_profiles` server-side after `exchangeCodeForSession`; same redirect logic.
+
+**`/onboarding` page** (`src/app/onboarding/page.tsx`):
+- Server Component — reads the current user from `getClaims()`, then queries `user_profiles` with `.maybeSingle()`
+- If no profile found: renders empty `OnboardingForm`
+- If profile found: renders `OnboardingForm` prefilled (user can update their profile at any time by revisiting `/onboarding`)
+
+**`OnboardingForm` component** (`src/components/onboarding-form.tsx`):
+- Client Component (`'use client'`)
+- Fields: background, goals, tone, roles (comma-separated → `text[]`), industries (comma-separated → `text[]`), emphasis
+- On submit calls the `upsertProfile` server action
+
+**`upsertProfile` server action** (`src/app/onboarding/actions.ts`):
+- Runs server-side; reads `user_id` from session claims (never from the form body — prevents spoofing)
+- Issues a Supabase `.upsert()` with `onConflict: 'user_id'`: inserts on first save, updates in place on subsequent saves
+- Returns `{ error: string | null }` — form displays any error inline
+
+**`/app/prospects` page** (`src/app/app/prospects/page.tsx`):
+- Server Component — placeholder dashboard (content coming later)
+- Secondary gate: if user somehow lands here with no profile row → redirect to `/onboarding`
+- Shows "Edit profile" link back to `/onboarding` and a Logout button
+
+**Tested and confirmed working:**
+- New user signs up → logs in → no profile row → `/onboarding` → fills form → `/app/prospects`
+- Returning user logs in → profile row exists → `/app/prospects` directly
+- Revisiting `/onboarding` while logged in with a profile → form is prefilled for editing
+
+---
+
 ### What's next (high-level)
 
 1. Build a proper home page (`/`) with a "Log in" button (currently just the default Next.js scaffold)
-2. Create MVP tables in Supabase: `user_profiles`, `prospects`, `drafts`
-3. Enable RLS and add per-user policies on all three tables
-4. Build `/onboarding` to collect and save `user_profiles`
-5. Add route gating: logged in but no profile → `/onboarding`; no session → `/auth/login`
-6. Build `/app/prospects` dashboard (empty state first)
-7. Then: `POST /api/generate` endpoint + Chrome extension
+2. Create `prospects` and `drafts` tables in Supabase with RLS policies
+3. Build out the real `/app/prospects` dashboard (list view, statuses)
+4. Build `POST /api/generate` endpoint (Apify enrichment + LLM draft generation)
+5. Build Chrome extension (WXT + React side panel)
