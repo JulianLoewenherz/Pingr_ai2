@@ -157,10 +157,22 @@ Note: `SUPABASE_SERVICE_ROLE_KEY` will be added later for server-only API endpoi
 
 ---
 
+### Home page (complete and tested)
+
+**`/` route** (`src/app/page.tsx`):
+- Server Component — reads session via `getClaims()`
+- Unauthenticated: "Pingr" heading + "Log in" and "Create account" buttons → `/auth/login`, `/auth/sign-up`
+- Authenticated: "Signed in as {email}" + "Go to Dashboard" button → `/app/prospects`
+
+**Middleware** (`src/lib/supabase/middleware.ts`):
+- `/` added to public paths — unauthenticated users can access home and `/auth/*` only
+- All other routes require authentication
+
+---
+
 ### What's next (high-level)
 
-1. Build a proper home page (`/`) with a "Log in" button (currently just the default Next.js scaffold)
-2. Create `prospects` and `drafts` tables in Supabase with RLS policies
+1. Create `prospects` and `drafts` tables in Supabase with RLS policies
 3. Build out the real `/app/prospects` dashboard (list view, statuses)
 4. Build `POST /api/generate` endpoint (Apify enrichment + LLM draft generation)
 5. Build Chrome extension (WXT + React side panel)
