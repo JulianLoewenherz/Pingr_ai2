@@ -48,7 +48,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
       if (error) throw error
 
       // When "Confirm email" is off in Supabase, signUp returns a session and we can send them straight in
-      if (data.session) {
+      if (data.session && data.user) {
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('user_id')
