@@ -15,6 +15,14 @@ type Prospect = {
   created_at: string
 }
 
+type Draft = {
+  id: string
+  prospect_id: string
+  draft_text: string
+  personalization_note: string | null
+  created_at: string
+}
+
 const STATUS_LABELS: Record<string, string> = {
   draft_generated: 'Draft',
   copied: 'Copied',
@@ -49,10 +57,12 @@ export default async function ProspectsPage() {
     redirect('/auth/login')
   }
 
+  const userId = authData.claims.sub as string
+
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('user_id')
-    .eq('user_id', authData.claims.sub)
+    .eq('user_id', userId)
     .maybeSingle()
 
   if (!profile) {
@@ -65,6 +75,18 @@ export default async function ProspectsPage() {
     .order('created_at', { ascending: false })
 
   const list = (prospects ?? []) as Prospect[]
+
+  const { data: drafts } = await supabase
+    .from('drafts')
+    .select('id, prospect_id, draft_text, personalization_note, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  const draftsByProspect = new Map<string, Draft[]>()
+  for (const draft of (drafts ?? []) as Draft[]) {
+    const existing = draftsByProspect.get(draft.prospect_id) ?? []
+    draftsByProspect.set(draft.prospect_id, [...existing, draft])
+  }
 
   return (
     <div className="min-h-svh bg-background">
@@ -105,6 +127,7 @@ export default async function ProspectsPage() {
           ) : (
             <ul className="flex flex-col gap-3">
               {list.map((prospect) => {
+                const draftsForProspect = draftsByProspect.get(prospect.id) ?? []
                 const label = prospect.status
                   ? (STATUS_LABELS[prospect.status] ?? prospect.status)
                   : null
@@ -117,24 +140,55 @@ export default async function ProspectsPage() {
                 return (
                   <li
                     key={prospect.id}
-                    className="flex items-center justify-between rounded-xl border px-5 py-4"
+                    className="rounded-xl border px-5 py-4"
                   >
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="font-medium text-sm truncate">{name}</span>
-                      {sub && (
-                        <span className="text-xs text-muted-foreground truncate">{sub}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0 ml-4">
-                      {label && color && (
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${color}`}>
-                          {label}
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="font-medium text-sm truncate">{name}</span>
+                        {sub && (
+                          <span className="text-xs text-muted-foreground truncate">{sub}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        {label && color && (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${color}`}>
+                            {label}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formatDate(prospect.created_at)}
                         </span>
-                      )}
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDate(prospect.created_at)}
-                      </span>
+                      </div>
                     </div>
+
+                    {draftsForProspect.length > 0 && (
+                      <details className="mt-3">
+                        <summary className="text-xs text-muted-foreground cursor-pointer flex items-center justify-between">
+                          <span>View drafts ({draftsForProspect.length})</span>
+                          <span className="ml-2 text-[10px]">▼</span>
+                        </summary>
+                        <div className="mt-2 flex flex-col gap-2">
+                          {draftsForProspect.map((draft) => (
+                            <div
+                              key={draft.id}
+                              className="rounded-lg border bg-muted/40 px-3 py-2 text-xs flex flex-col gap-1"
+                            >
+                              <p className="font-medium text-foreground whitespace-pre-wrap">
+                                {draft.draft_text}
+                              </p>
+                              {draft.personalization_note && (
+                                <p className="text-muted-foreground">
+                                  {draft.personalization_note}
+                                </p>
+                              )}
+                              <p className="text-[10px] text-muted-foreground">
+                                {formatDate(draft.created_at)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </li>
                 )
               })}
