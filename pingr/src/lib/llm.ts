@@ -27,7 +27,8 @@ export async function generateLinkedInDraft(
 
   const systemPrompt = `You are an expert at writing personalized LinkedIn coffee chat messages. \
 Your messages are concise (strictly under 300 characters), warm, genuine, and reference specific \
-details from the recipient's actual background — never generic flattery. \
+details from the recipient's actual background, never generic flattery. \
+Never use em dashes (--) or any special punctuation; use only plain commas, periods, and spaces. \
 Always respond with valid JSON only, no markdown.`
 
   const userPrompt = `Write a personalized LinkedIn coffee chat message from me to this person.
@@ -44,14 +45,16 @@ ${prospectContext}
 
 Requirements:
 1. The message must be strictly under 300 characters (count carefully)
-2. Reference something specific and real from their profile (a company, school, role, or project)
-3. Feel genuine and human, not copy-paste or templated
-4. End with a clear but low-pressure ask for a quick chat or call
+2. FIRST, scan my background and their profile for any shared companies, organizations, schools, or projects. If any overlap exists, lead with that shared connection as the primary hook.
+3. If no overlap exists, reference something specific and real from their profile (a company, school, role, or project)
+4. Feel genuine and human, not copy-paste or templated
+5. End with a clear but low-pressure ask for a quick chat or call
+6. Never use em dashes (--) or special punctuation of any kind
 
 Respond ONLY with this JSON object:
 {
   "message": "the LinkedIn message text here",
-  "personalization_note": "1-2 sentences explaining the personalization angle you used"
+  "personalization_note": "1-2 sentences explaining the personalization angle you used, and whether a shared connection was found"
 }`
 
   const completion = await openai.chat.completions.create({
