@@ -94,6 +94,8 @@ export function normalizeProfile(raw: ApifyProfileRaw): NormalizedProspect {
 /**
  * Builds a human-readable context string about the prospect for use in the LLM prompt.
  */
+
+//not using currently I think
 export function buildProspectContext(raw: ApifyProfileRaw): string {
   const firstName = (raw.firstName as string) ?? ''
   const lastName = (raw.lastName as string) ?? ''
