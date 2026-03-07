@@ -8,8 +8,8 @@ export default defineConfig({
     description: 'AI-powered LinkedIn outreach assistant',
     permissions: ['sidePanel', 'tabs', 'storage'],
     host_permissions: [
-      // Dev backend — update to your production URL when you deploy
       'http://localhost:3000/*',
+      'https://pingr-ai2.vercel.app/*',
     ],
     side_panel: {
       default_path: 'sidepanel.html',
