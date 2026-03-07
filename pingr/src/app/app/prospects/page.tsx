@@ -70,7 +70,7 @@ export default async function ProspectsPage() {
     <div className="min-h-svh bg-background">
       <header className="border-b">
         <div className="mx-auto max-w-3xl flex items-center justify-between px-6 py-4">
-          <span className="font-semibold">Pingr</span>
+          <Link href="/" className="font-semibold hover:opacity-70 transition-opacity">Pingr</Link>
           <div className="flex items-center gap-4">
             <Link
               href="/onboarding"

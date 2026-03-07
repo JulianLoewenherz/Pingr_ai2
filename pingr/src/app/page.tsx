@@ -13,8 +13,30 @@ export default async function HomePage() {
   const email = (user?.email as string) ?? null
 
   return (
-    <div className="flex min-h-svh w-full flex-col items-center justify-center p-8">
-      <div className="flex max-w-md flex-col items-center gap-10 text-center">
+    <div className="relative flex min-h-svh w-full flex-col items-center justify-center overflow-hidden p-8">
+      {/* Concentric arch rings — center sits just below the viewport bottom */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div
+          className="absolute left-1/2"
+          style={{ bottom: '-60px', transform: 'translateX(-50%)' }}
+        >
+          {([280, 440, 600] as const).map((r, i) => (
+            <div
+              key={r}
+              className="absolute rounded-full border border-foreground"
+              style={{
+                width: r * 2,
+                height: r * 2,
+                top: -r,
+                left: -r,
+                opacity: [0.1, 0.07, 0.045][i],
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="relative z-10 flex max-w-md flex-col items-center gap-10 text-center">
         <header className="flex flex-col items-center gap-3">
           <h1 className="font-serif text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
             Pingr
@@ -22,8 +44,11 @@ export default async function HomePage() {
           <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
             Personalized LinkedIn outreach in context. Draft messages where you browse.
           </p>
+          <p className="text-xs text-muted-foreground/90">
+            Completely free — up to 10 messages a day.
+          </p>
           <span
-            className="mt-1 block h-px w-12 rounded-full bg-border"
+            className="mt-1 block h-px w-16 rounded-full bg-linear-to-r from-transparent via-foreground/20 to-transparent"
             aria-hidden
           />
         </header>
@@ -37,7 +62,7 @@ export default async function HomePage() {
               </Button>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <div className="w-full max-w-sm overflow-hidden rounded-xl border bg-muted/20 shadow-sm">
+              <div className="w-full max-w-sm overflow-hidden rounded-xl border border-border/80 bg-muted/20 shadow-sm transition-shadow duration-300 hover:shadow-md hover:border-border">
                 <Image
                   src="/extension-in-action.png"
                   alt="Pingr extension side panel on a LinkedIn profile"
@@ -61,7 +86,7 @@ export default async function HomePage() {
               </Button>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <div className="w-full max-w-sm overflow-hidden rounded-xl border bg-muted/20 shadow-sm">
+              <div className="w-full max-w-sm overflow-hidden rounded-xl border border-border/80 bg-muted/20 shadow-sm transition-shadow duration-300 hover:shadow-md hover:border-border">
                 <Image
                   src="/extension-in-action.png"
                   alt="Pingr extension side panel on a LinkedIn profile"
