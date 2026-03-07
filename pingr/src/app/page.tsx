@@ -1,8 +1,10 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { ProfileIconWithEmail } from '@/components/profile-icon-with-email'
+import { ExtensionInstallModal } from '@/components/extension-install-modal'
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -27,22 +29,50 @@ export default async function HomePage() {
         </header>
 
         {email ? (
-          <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-8">
             <div className="flex items-center gap-4">
               <ProfileIconWithEmail email={email} />
               <Button asChild className="font-serif">
                 <Link href="/app/prospects">Go to Dashboard</Link>
               </Button>
             </div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-full max-w-sm overflow-hidden rounded-xl border bg-muted/20 shadow-sm">
+                <Image
+                  src="/extension-in-action.png"
+                  alt="Pingr extension side panel on a LinkedIn profile"
+                  width={448}
+                  height={320}
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Extension in action</p>
+            </div>
+            <ExtensionInstallModal />
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-4 sm:flex-row">
-            <Button asChild className="font-serif">
-              <Link href="/auth/login">Log in</Link>
-            </Button>
-            <Button asChild variant="outline" className="font-serif">
-              <Link href="/auth/sign-up">Create account</Link>
-            </Button>
+          <div className="flex flex-col items-center gap-8">
+            <div className="flex items-center gap-4 sm:flex-row">
+              <Button asChild className="font-serif">
+                <Link href="/auth/login">Log in</Link>
+              </Button>
+              <Button asChild variant="outline" className="font-serif">
+                <Link href="/auth/sign-up">Create account</Link>
+              </Button>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-full max-w-sm overflow-hidden rounded-xl border bg-muted/20 shadow-sm">
+                <Image
+                  src="/extension-in-action.png"
+                  alt="Pingr extension side panel on a LinkedIn profile"
+                  width={448}
+                  height={320}
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Extension in action</p>
+            </div>
+            <ExtensionInstallModal />
           </div>
         )}
       </div>
