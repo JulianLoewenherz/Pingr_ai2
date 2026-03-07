@@ -32,6 +32,23 @@ export async function POST(request: NextRequest) {
   if (!resolved) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { userId, supabase } = resolved
 
+  // --- Daily limit: 10 message generations per day (UTC) ---
+  const now = new Date()
+  const startOfDayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString()
+  const startOfNextDayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString()
+  const { count, error: countError } = await supabase
+    .from('drafts')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', startOfDayUtc)
+    .lt('created_at', startOfNextDayUtc)
+  if (countError || (count ?? 0) >= 10) {
+    return NextResponse.json(
+      { error: 'Daily limit reached (10 message generations per day). Resets at midnight UTC.' },
+      { status: 429 }
+    )
+  }
+
   // --- Parse body ---
   let linkedinUrl: string
   try {
