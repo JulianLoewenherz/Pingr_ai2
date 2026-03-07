@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import type { ApifyProfileRaw } from './apify'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -9,6 +10,70 @@ export type UserProfileContext = {
   roles: string[] | null
   industries: string[] | null
   emphasis: string | null
+}
+
+export type ExtractedSelfProfile = {
+  background: string
+  goals: string
+  tone: string
+  roles: string[]
+  industries: string[]
+  emphasis: string
+}
+
+export async function extractSelfProfileFromLinkedIn(
+  raw: ApifyProfileRaw
+): Promise<ExtractedSelfProfile> {
+  const systemPrompt = `You are an assistant that extracts structured profile information from a LinkedIn profile JSON.
+You will return a JSON object with specific fields used to personalize outreach messages.
+Always respond with valid JSON only, no markdown, no explanation.`
+
+  const userPrompt = `Given this LinkedIn profile JSON, extract the following fields:
+
+- background: A very detailed description of who this person is — their education (school, degree, year if available) and work, volunteering and club experience.
+- goals: Your best inference about what career goals this person likely has based on their trajectory. Be specific if possible (e.g. "Exploring product management roles in fintech"). If unclear, write a reasonable guess.
+- tone: Infer a writing tone that would suit this person based on their profile (e.g. "professional", "friendly and direct", "warm and conversational"). Default to "friendly and professional" if unsure.
+- roles: An array of job title strings representing their likely roles of interest, inferred from their experience. e.g. ["Software Engineer", "Engineering Manager"]
+- industries: An array of industry strings they likely care about, inferred from past employers/roles. e.g. ["Fintech", "AI", "Healthcare"]
+- emphasis: One sentence about something distinctive to emphasize in outreach — a standout project, prestigious employer, unique background, etc. Leave as empty string if nothing stands out.
+
+LinkedIn profile JSON:
+${JSON.stringify(raw, null, 2)}
+
+Respond ONLY with this JSON object:
+{
+  "background": "...",
+  "goals": "...",
+  "tone": "...",
+  "roles": ["..."],
+  "industries": ["..."],
+  "emphasis": "..."
+}`
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+    max_tokens: 600,
+  })
+
+  const content = completion.choices[0]?.message?.content
+  if (!content) throw new Error('No content returned from LLM')
+
+  const parsed = JSON.parse(content) as Partial<ExtractedSelfProfile>
+
+  return {
+    background: parsed.background ?? '',
+    goals: parsed.goals ?? '',
+    tone: parsed.tone ?? 'friendly and professional',
+    roles: Array.isArray(parsed.roles) ? parsed.roles : [],
+    industries: Array.isArray(parsed.industries) ? parsed.industries : [],
+    emphasis: parsed.emphasis ?? '',
+  }
 }
 
 export type GeneratedDraft = {

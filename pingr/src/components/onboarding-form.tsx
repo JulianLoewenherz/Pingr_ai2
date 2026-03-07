@@ -22,19 +22,75 @@ type ProfileData = {
   roles: string[] | null
   industries: string[] | null
   emphasis: string | null
+  linkedin_url: string | null
 }
 
 export function OnboardingForm({ existing }: { existing: ProfileData | null }) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [isAutoFilling, setIsAutoFilling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [autoFillError, setAutoFillError] = useState<string | null>(null)
+  const [autoFilled, setAutoFilled] = useState(false)
 
+  const [linkedinUrl, setLinkedinUrl] = useState(existing?.linkedin_url ?? '')
   const [background, setBackground] = useState(existing?.background ?? '')
   const [goals, setGoals] = useState(existing?.goals ?? '')
   const [tone, setTone] = useState(existing?.tone ?? '')
   const [roles, setRoles] = useState((existing?.roles ?? []).join(', '))
   const [industries, setIndustries] = useState((existing?.industries ?? []).join(', '))
   const [emphasis, setEmphasis] = useState(existing?.emphasis ?? '')
+
+  const handleAutoFill = async () => {
+    setAutoFillError(null)
+    setAutoFilled(false)
+
+    if (!linkedinUrl.trim()) {
+      setAutoFillError('Please enter your LinkedIn profile URL first.')
+      return
+    }
+
+    setIsAutoFilling(true)
+
+    try {
+      const res = await fetch('/api/autofill-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ linkedinUrl: linkedinUrl.trim() }),
+      })
+
+      const data = await res.json() as {
+        fields?: {
+          background: string
+          goals: string
+          tone: string
+          roles: string[]
+          industries: string[]
+          emphasis: string
+        }
+        error?: string
+      }
+
+      if (!res.ok || data.error) {
+        setAutoFillError(data.error ?? 'Something went wrong. Please try again.')
+        return
+      }
+
+      if (data.fields) {
+        setBackground(data.fields.background)
+        setGoals(data.fields.goals)
+        setTone(data.fields.tone)
+        setRoles(data.fields.roles.join(', '))
+        setIndustries(data.fields.industries.join(', '))
+        setEmphasis(data.fields.emphasis)
+        setAutoFilled(true)
+      }
+    } catch {
+      setAutoFillError('Network error. Please try again.')
+    } finally {
+      setIsAutoFilling(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,6 +104,7 @@ export function OnboardingForm({ existing }: { existing: ProfileData | null }) {
       roles: roles.split(',').map((s) => s.trim()).filter(Boolean),
       industries: industries.split(',').map((s) => s.trim()).filter(Boolean),
       emphasis,
+      linkedin_url: linkedinUrl.trim() || undefined,
     })
 
     if (result?.error) {
@@ -74,6 +131,46 @@ export function OnboardingForm({ existing }: { existing: ProfileData | null }) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+
+            {/* Auto-fill section */}
+            <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4 flex flex-col gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="linkedin_url">Your LinkedIn profile URL</Label>
+                <p className="text-xs text-muted-foreground">
+                  Paste your LinkedIn URL to auto-fill the fields below.
+                </p>
+                <Input
+                  id="linkedin_url"
+                  type="url"
+                  value={linkedinUrl}
+                  onChange={(e) => {
+                    setLinkedinUrl(e.target.value)
+                    setAutoFillError(null)
+                    setAutoFilled(false)
+                  }}
+                  placeholder="https://www.linkedin.com/in/your-name"
+                  disabled={isAutoFilling}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAutoFill}
+                disabled={isAutoFilling || isLoading}
+                className="w-full"
+              >
+                {isAutoFilling ? 'Scanning your LinkedIn… this may take up to 30 seconds' : 'Auto-fill for me'}
+              </Button>
+              {autoFillError && (
+                <p className="text-sm text-red-500">{autoFillError}</p>
+              )}
+              {autoFilled && (
+                <p className="text-sm text-green-600">
+                  Fields filled from your LinkedIn — review and edit before saving.
+                </p>
+              )}
+            </div>
+
             <div className="grid gap-1.5">
               <Label htmlFor="background">Background</Label>
               <p className="text-xs text-muted-foreground">
@@ -155,7 +252,7 @@ export function OnboardingForm({ existing }: { existing: ProfileData | null }) {
 
             {error && <p className="text-sm text-red-500">{error}</p>}
 
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || isAutoFilling}>
               {isLoading ? 'Saving...' : existing ? 'Update profile' : 'Save and continue'}
             </Button>
           </form>

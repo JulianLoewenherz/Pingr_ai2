@@ -14,7 +14,7 @@ export default async function OnboardingPage() {
   // Load existing profile (null if first visit)
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('background, goals, tone, roles, industries, emphasis')
+    .select('background, goals, tone, roles, industries, emphasis, linkedin_url')
     .eq('user_id', authData.claims.sub)
     .maybeSingle()
 

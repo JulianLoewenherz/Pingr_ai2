@@ -9,6 +9,7 @@ type ProfileInput = {
   roles: string[]
   industries: string[]
   emphasis: string
+  linkedin_url?: string
 }
 
 export async function upsertProfile(data: ProfileInput): Promise<{ error: string | null }> {
@@ -30,6 +31,7 @@ export async function upsertProfile(data: ProfileInput): Promise<{ error: string
       roles: data.roles,
       industries: data.industries,
       emphasis: data.emphasis,
+      ...(data.linkedin_url ? { linkedin_url: data.linkedin_url } : {}),
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id' }
