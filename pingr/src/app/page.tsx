@@ -23,13 +23,13 @@ export default async function HomePage() {
           {([280, 440, 600] as const).map((r, i) => (
             <div
               key={r}
-              className="absolute rounded-full border border-foreground"
+              className="absolute rounded-full border-2 border-foreground"
               style={{
                 width: r * 2,
                 height: r * 2,
                 top: -r,
                 left: -r,
-                opacity: [0.1, 0.07, 0.045][i],
+                opacity: [0.18, 0.13, 0.09][i],
               }}
             />
           ))}
