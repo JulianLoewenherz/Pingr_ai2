@@ -239,13 +239,115 @@ File: `Pingr_ai2/pingr/.env.local`
 
 ---
 
+### Dashboard — prospect list live refresh (complete)
+
+**`router.refresh()` added to `GenerateDraftForm`** (`src/components/generate-draft-form.tsx`):
+- After a successful Generate (and after Regenerate), calls `useRouter().refresh()`
+- Next.js re-runs the Server Component and refetches the `prospects` list, so the new prospect appears in the list below without a full page reload — no Supabase Realtime needed for the web app flow
+- Note: this only refreshes the tab where the user is. If a prospect is created via the extension, the dashboard tab will not auto-update (manual refresh or Realtime needed for that later).
+
+---
+
+### Chrome extension — full MVP (Milestone 4, complete and tested)
+
+**Repo location:** `Pingr_ai2/extension/` (sibling to `pingr/`, same monorepo)
+**Framework:** WXT 0.20.18 + React + TypeScript (Vite under the hood, MV3)
+
+**Extension file structure:**
+```
+extension/
+├── .env                          # VITE_ prefixed env vars (Supabase + API base URL)
+├── wxt.config.ts                 # manifest: name, permissions, side_panel, host_permissions
+├── lib/
+│   ├── supabase.ts               # Supabase client with chrome.storage.local adapter
+│   └── api.ts                    # generateDraft() and updateStatus() wrappers
+└── entrypoints/
+    ├── background.ts             # Opens side panel on icon click
+    ├── content.ts                # Injected on linkedin.com/in/* pages
+    └── sidepanel/
+        ├── index.html
+        ├── main.tsx
+        └── App.tsx               # Full UI: login → generate → copy/status
+```
+
+**`extension/.env`:**
+- `VITE_SUPABASE_URL` — Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` — Supabase publishable key (used by all clients)
+- `VITE_API_BASE_URL` — `http://localhost:3000` (update to production URL when deployed)
+
+**`extension/lib/supabase.ts`:**
+- Creates a `@supabase/supabase-js` client
+- Uses `chrome.storage.local` as the auth storage adapter so the session (access token + refresh token) persists across extension reloads and browser restarts
+- `autoRefreshToken: true` — Supabase handles token renewal automatically
+- `detectSessionInUrl: false` — not needed in extension context
+
+**`extension/lib/api.ts`:**
+- `generateDraft(linkedinUrl)` — calls `POST /api/generate` with `Authorization: Bearer <access_token>`
+- `updateStatus(prospectId, status)` — calls `POST /api/prospects/status` with same auth header
+- Both read the current access token from `supabase.auth.getSession()` before each call
+
+**`extension/entrypoints/background.ts`:**
+- Calls `chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })` so clicking the extension icon opens the side panel directly
+- Falls back to `chrome.action.onClicked` → `chrome.sidePanel.open()` for older Chrome versions
+
+**`extension/wxt.config.ts` — manifest:**
+- Permissions: `sidePanel`, `tabs`, `storage`
+- `tabs` permission needed to read the active tab URL as the user navigates within an open side panel
+- `host_permissions`: `http://localhost:3000/*` (dev); add production URL when deploying
+- `side_panel.default_path`: `sidepanel.html`
+
+**`extension/entrypoints/sidepanel/App.tsx` — side panel UI:**
+- Three views: `checking` (restoring session) → `login` → `main`
+- **Login view:** email + password form using `supabase.auth.signInWithPassword()`; same account as the web app; session stored in `chrome.storage.local`
+- **Main view:**
+  - Reads active tab URL via `chrome.tabs.query({ active: true, currentWindow: true })`
+  - Watches for tab URL changes via `chrome.tabs.onActivated` and `chrome.tabs.onUpdated`
+  - If current tab is a LinkedIn profile (`linkedin.com/in/*`): shows URL + **Generate message** button
+  - If not a LinkedIn profile: shows empty state "Open a LinkedIn profile"
+  - After generate: shows prospect name/headline/company, generated message, character count, personalization angle
+  - Actions: **Copy message** (copies draft + calls `updateStatus(id, 'copied')`), **Regenerate**, **Mark sent** (`updateStatus(id, 'marked_sent')`)
+- **Sign out** button in header
+
+**Extension auth note:**
+- Extension only supports email/password login. Google OAuth in extensions requires `chrome.identity.launchWebAuthFlow` which is a separate, more complex implementation. If you signed up with Google OAuth only, use the web app's "Forgot Password" flow to set a password, then use that in the extension.
+
+**To load / reload in Chrome:**
+1. Go to `chrome://extensions` → enable Developer mode
+2. Click "Load unpacked" → point to `extension/.output/chrome-mv3/`
+3. After code changes: run `npm run build` in `extension/`, then click the refresh icon on the extension card
+
+---
+
+### Backend — Bearer token auth support (complete)
+
+**`src/lib/supabase/resolve-request-user.ts`** (new shared helper):
+- Checks for `Authorization: Bearer <token>` header first (extension path):
+  - Creates a `@supabase/supabase-js` client with the token in `global.headers` so Supabase RLS policies (`auth.uid() = user_id`) evaluate correctly for DB queries
+  - Calls `supabase.auth.getUser(token)` to verify the token is valid
+  - Returns `{ userId, supabase }`
+- Falls back to cookie session (web app path):
+  - Uses existing `createCookieClient()` from `@supabase/ssr`
+  - Calls `supabase.auth.getClaims()`
+  - Returns `{ userId, supabase }`
+- Returns `null` if unauthenticated via both methods → route returns 401
+
+**`POST /api/generate`** and **`POST /api/prospects/status`**:
+- Auth block replaced with `resolveRequestUser(request)` — both now work for web app (cookie) and extension (Bearer token) with no other changes
+
+---
+
 ### What's next (high-level)
 
 1. ~~Create `prospects` and `drafts` tables in Supabase with RLS policies~~ ✓ Done
 2. ~~Build out the real `/app/prospects` dashboard (list view, statuses)~~ ✓ Done
 3. ~~Build `POST /api/generate` endpoint (Apify + LLM + store prospect + draft)~~ ✓ Done
 4. ~~Add status update endpoint~~ ✓ Done (`POST /api/prospects/status`)
-5. **Fix drafts RLS** (if insert still fails): ensure `drafts` policy includes `with check (auth.uid() = user_id)` in Supabase
-6. **Build Chrome extension** (Milestone 4): WXT MV3 + React side panel, auth in extension, call `POST /api/generate` with current tab LinkedIn URL, Copy / Regenerate / Mark sent
-7. **Wire extension status buttons** (Milestone 5): Mark sent, Replied, Follow-up needed → `POST /api/prospects/status`
-8. **Polish** (Milestone 6): rate limit, retries, monitoring (optional)
+5. ~~Build Chrome extension (Milestone 4): scaffold, auth, generate flow, status buttons~~ ✓ Done
+6. ~~Backend: accept Bearer token from extension alongside cookie session~~ ✓ Done
+7. ~~Dashboard prospect list refreshes after generate (router.refresh)~~ ✓ Done
+8. **Fix drafts RLS** (if insert still fails): ensure `drafts` policy includes `with check (auth.uid() = user_id)` in Supabase
+9. **More status buttons in extension** (Milestone 5): add Replied, Skipped, Follow-up needed to the extension side panel (the API already supports them)
+10. **Prospect detail on dashboard**: clicking a prospect row shows the stored draft for that prospect (so you can review past messages without regenerating)
+11. **Google OAuth in extension** (optional): implement `chrome.identity.launchWebAuthFlow` + add `https://<extension-id>.chromiumapp.org/` to Supabase allowed redirect URLs and Google Cloud Console
+12. **Supabase Realtime on dashboard** (optional): subscribe to `prospects` INSERT so the dashboard tab auto-updates when the extension creates a prospect, without the user having to refresh manually
+13. **Deploy** (Milestone 6): deploy Next.js app to Vercel/Railway, update `VITE_API_BASE_URL` in extension `.env`, add production URL to manifest `host_permissions`, republish extension build
