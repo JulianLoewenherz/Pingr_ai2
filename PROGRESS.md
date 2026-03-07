@@ -38,8 +38,30 @@ This file captures what's been set up so far for Pingr MVP (as of the latest ses
 - `updated_at timestamptz` — nullable, set to `now()` on every upsert in application code
 - **RLS enabled** with policy: `Users manage own profile` — `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`
 
-- Next planned Supabase tasks (not done yet):
-  - Create `prospects` and `drafts` tables with RLS
+**`prospects` table (created and working):**
+- `id uuid` — primary key, default `gen_random_uuid()`
+- `user_id uuid` — not null, FK to `auth.users(id)` ON DELETE CASCADE
+- `linkedin_url text` — not null
+- `display_name text` — nullable
+- `headline text` — nullable
+- `company text` — nullable
+- `location text` — nullable
+- `apify_raw jsonb` — nullable (full Apify response stored here)
+- `status text` — nullable (e.g. `marked_sent`)
+- `status_updated_at timestamptz` — nullable
+- `created_at timestamptz` — not null, default `now()`
+- `updated_at timestamptz` — nullable
+- Unique constraint on `(user_id, linkedin_url)` — one prospect per user per URL
+- **RLS enabled** with policy: `Users manage own prospects` — `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`
+
+**`drafts` table (created and working):**
+- `id uuid` — primary key, default `gen_random_uuid()`
+- `user_id uuid` — not null, FK to `auth.users(id)` ON DELETE CASCADE
+- `prospect_id uuid` — not null, FK to `prospects(id)` ON DELETE CASCADE
+- `draft_text text` — not null
+- `personalization_note text` — nullable
+- `created_at timestamptz` — not null, default `now()`
+- **RLS enabled** with policy: `Users manage own drafts` — `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`
 
 ---
 
@@ -146,9 +168,14 @@ Note: `SUPABASE_SERVICE_ROLE_KEY` will be added later for server-only API endpoi
 - Returns `{ error: string | null }` — form displays any error inline
 
 **`/app/prospects` page** (`src/app/app/prospects/page.tsx`):
-- Server Component — placeholder dashboard (content coming later)
+- Server Component — real prospects dashboard, live data from Supabase
 - Secondary gate: if user somehow lands here with no profile row → redirect to `/onboarding`
-- Shows "Edit profile" link back to `/onboarding` and a Logout button
+- Top nav: "Pingr" brand, "Edit profile" link, Logout button
+- Fetches all `prospects` rows for the current user, ordered most recent first
+- Each row shows: name (falls back to LinkedIn URL), headline · company subtitle, status badge, created date
+- Status badge is color-coded; currently `marked_sent` → green "Sent" label (easy to extend)
+- Empty state: dashed border placeholder with extension install prompt
+- Prospect count shown in subtitle below page heading
 
 **Tested and confirmed working:**
 - New user signs up → logs in → no profile row → `/onboarding` → fills form → `/app/prospects`
@@ -172,7 +199,8 @@ Note: `SUPABASE_SERVICE_ROLE_KEY` will be added later for server-only API endpoi
 
 ### What's next (high-level)
 
-1. Create `prospects` and `drafts` tables in Supabase with RLS policies
-3. Build out the real `/app/prospects` dashboard (list view, statuses)
-4. Build `POST /api/generate` endpoint (Apify enrichment + LLM draft generation)
-5. Build Chrome extension (WXT + React side panel)
+1. ~~Create `prospects` and `drafts` tables in Supabase with RLS policies~~ ✓ Done
+2. ~~Build out the real `/app/prospects` dashboard (list view, statuses)~~ ✓ Done
+3. Build `POST /api/generate` endpoint (Apify enrichment + LLM draft generation)
+4. Build Chrome extension (WXT + React side panel)
+5. Add status update endpoint + wire extension buttons to it

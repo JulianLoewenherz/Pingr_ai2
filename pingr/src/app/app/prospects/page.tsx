@@ -4,6 +4,32 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { LogoutButton } from '@/components/logout-button'
 
+type Prospect = {
+  id: string
+  linkedin_url: string
+  display_name: string | null
+  headline: string | null
+  company: string | null
+  status: string | null
+  created_at: string
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  marked_sent: 'Sent',
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  marked_sent: 'bg-green-100 text-green-700',
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 export default async function ProspectsPage() {
   const supabase = await createClient()
 
@@ -12,7 +38,6 @@ export default async function ProspectsPage() {
     redirect('/auth/login')
   }
 
-  // Gate: no profile → onboarding
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('user_id')
@@ -23,23 +48,85 @@ export default async function ProspectsPage() {
     redirect('/onboarding')
   }
 
+  const { data: prospects } = await supabase
+    .from('prospects')
+    .select('id, linkedin_url, display_name, headline, company, status, created_at')
+    .order('created_at', { ascending: false })
+
+  const list = (prospects ?? []) as Prospect[]
+
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-4 text-center">
-      <h1 className="text-2xl font-semibold">Prospects</h1>
-      <p className="text-muted-foreground">
-        Your outreach dashboard is coming soon.
-        <br />
-        Install the Chrome extension to start generating messages.
-      </p>
-      <div className="flex gap-3">
-        <Link
-          href="/onboarding"
-          className="text-sm underline underline-offset-4 text-muted-foreground hover:text-foreground"
-        >
-          Edit profile
-        </Link>
-        <LogoutButton />
-      </div>
+    <div className="min-h-svh bg-background">
+      <header className="border-b">
+        <div className="mx-auto max-w-3xl flex items-center justify-between px-6 py-4">
+          <span className="font-semibold">Pingr</span>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/onboarding"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Edit profile
+            </Link>
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-3xl px-6 py-10">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold">Prospects</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {list.length === 0
+              ? 'No prospects yet.'
+              : `${list.length} prospect${list.length === 1 ? '' : 's'}`}
+          </p>
+        </div>
+
+        {list.length === 0 ? (
+          <div className="rounded-xl border border-dashed p-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              Install the Chrome extension and visit a LinkedIn profile to generate your first message.
+            </p>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {list.map((prospect) => {
+              const label = prospect.status
+                ? (STATUS_LABELS[prospect.status] ?? prospect.status)
+                : null
+              const color = prospect.status
+                ? (STATUS_COLORS[prospect.status] ?? 'bg-gray-100 text-gray-500')
+                : null
+              const name = prospect.display_name ?? prospect.linkedin_url
+              const sub = [prospect.headline, prospect.company].filter(Boolean).join(' · ')
+
+              return (
+                <li
+                  key={prospect.id}
+                  className="flex items-center justify-between rounded-xl border px-5 py-4"
+                >
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="font-medium text-sm truncate">{name}</span>
+                    {sub && (
+                      <span className="text-xs text-muted-foreground truncate">{sub}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0 ml-4">
+                    {label && color && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${color}`}>
+                        {label}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDate(prospect.created_at)}
+                    </span>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </main>
     </div>
   )
 }
