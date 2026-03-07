@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { createClient } from '@/lib/supabase/server'
+import { resolveRequestUser } from '@/lib/supabase/resolve-request-user'
 import { scrapeLinkedInProfile, normalizeProfile } from '@/lib/apify'
 import { generateLinkedInDraft } from '@/lib/llm'
 
@@ -27,13 +27,10 @@ function cleanLinkedInUrl(url: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  // --- Auth ---
-  const supabase = await createClient()
-  const { data: authData, error: authError } = await supabase.auth.getClaims()
-  if (authError || !authData?.claims) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  const userId = authData.claims.sub
+  // --- Auth (cookie session for web app; Bearer token for extension) ---
+  const resolved = await resolveRequestUser(request)
+  if (!resolved) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, supabase } = resolved
 
   // --- Parse body ---
   let linkedinUrl: string

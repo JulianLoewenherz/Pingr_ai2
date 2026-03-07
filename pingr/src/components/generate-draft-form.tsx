@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +24,7 @@ type GenerateResult = {
 }
 
 export function GenerateDraftForm({ onSuccess }: { onSuccess?: () => void }) {
+  const router = useRouter()
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,6 +54,7 @@ export function GenerateDraftForm({ onSuccess }: { onSuccess?: () => void }) {
 
       setResult(data as GenerateResult)
       onSuccess?.()
+      router.refresh()
     } catch {
       setError('Network error. Please check your connection and try again.')
     } finally {
@@ -95,6 +98,7 @@ export function GenerateDraftForm({ onSuccess }: { onSuccess?: () => void }) {
       }
 
       setResult(data as GenerateResult)
+      router.refresh()
     } catch {
       setError('Network error. Please try again.')
     } finally {
