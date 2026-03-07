@@ -1,7 +1,3 @@
-import { ApifyClient } from 'apify-client'
-
-const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN })
-
 export type ApifyProfileRaw = Record<string, unknown>
 
 export type NormalizedProspect = {
@@ -11,19 +7,63 @@ export type NormalizedProspect = {
   location: string | null
 }
 
-export async function scrapeLinkedInProfile(linkedinUrl: string): Promise<ApifyProfileRaw> {
-  const run = await apifyClient.actor('harvestapi/linkedin-profile-scraper').call({
-    profileScraperMode: 'Profile details no email ($4 per 1k)',
-    queries: [linkedinUrl],
-  })
+const APIFY_BASE = 'https://api.apify.com/v2'
+const ACTOR_ID = 'harvestapi~linkedin-profile-scraper'
 
-  const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems()
+type ApifyRunResponse = {
+  data: { id: string; defaultDatasetId: string; status: string }
+}
+type ApifyDatasetResponse = {
+  data: { items: ApifyProfileRaw[] }
+}
+
+export async function scrapeLinkedInProfile(linkedinUrl: string): Promise<ApifyProfileRaw> {
+  const token = process.env.APIFY_TOKEN
+  if (!token) throw new Error('APIFY_TOKEN is not configured')
+
+  // Start the actor run
+  const runRes = await fetch(`${APIFY_BASE}/acts/${ACTOR_ID}/runs?token=${token}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profileScraperMode: 'Profile details no email ($4 per 1k)',
+      queries: [linkedinUrl],
+    }),
+  })
+  if (!runRes.ok) {
+    const text = await runRes.text()
+    throw new Error(`Apify run start failed (${runRes.status}): ${text}`)
+  }
+  const { data: run } = await runRes.json() as ApifyRunResponse
+
+  // Poll until the run finishes (max ~55s to stay within the 60s Vercel limit)
+  const deadline = Date.now() + 55_000
+  let status = run.status
+  while (status !== 'SUCCEEDED' && status !== 'FAILED' && status !== 'ABORTED' && status !== 'TIMED-OUT') {
+    if (Date.now() > deadline) throw new Error('Apify run timed out waiting for completion')
+    await new Promise((r) => setTimeout(r, 3000))
+    const statusRes = await fetch(`${APIFY_BASE}/acts/${ACTOR_ID}/runs/${run.id}?token=${token}`)
+    if (!statusRes.ok) throw new Error(`Failed to poll Apify run status (${statusRes.status})`)
+    const { data: runData } = await statusRes.json() as ApifyRunResponse
+    status = runData.status
+  }
+
+  if (status !== 'SUCCEEDED') {
+    throw new Error(`Apify run ended with status: ${status}`)
+  }
+
+  // Fetch dataset items
+  const datasetRes = await fetch(
+    `${APIFY_BASE}/datasets/${run.defaultDatasetId}/items?token=${token}&format=json`
+  )
+  if (!datasetRes.ok) throw new Error(`Failed to fetch Apify dataset (${datasetRes.status})`)
+  const items = await datasetRes.json() as ApifyProfileRaw[]
 
   if (!items || items.length === 0) {
     throw new Error('No profile data returned from Apify')
   }
 
-  const profile = items[0] as ApifyProfileRaw
+  const profile = items[0]
 
   // Apify returns status 404 on the item when the profile isn't found
   if ((profile.status as number) === 404) {
