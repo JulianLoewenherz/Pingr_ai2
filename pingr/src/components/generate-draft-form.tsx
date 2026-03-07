@@ -129,9 +129,19 @@ export function GenerateDraftForm({ onSuccess }: { onSuccess?: () => void }) {
               disabled={loading}
               className="flex-1"
             />
-            <Button type="submit" disabled={loading || !url}>
-              {loading ? 'Generating…' : 'Generate'}
-            </Button>
+            <div className="relative flex flex-col items-center">
+              {loading && (
+                <div className="absolute -top-14 flex h-8 w-8 items-center justify-center">
+                  <div className="absolute h-8 w-8 rounded-full border border-foreground/15 animate-ping animation-duration-[2s] [animation-delay:1.35s]" />
+                  <div className="absolute h-8 w-8 rounded-full border border-foreground/25 animate-ping animation-duration-[2s] [animation-delay:0.67s]" />
+                  <div className="absolute h-8 w-8 rounded-full border border-foreground/40 animate-ping animation-duration-[2s]" />
+                  <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                </div>
+              )}
+              <Button type="submit" disabled={loading || !url}>
+                {loading ? 'Generating…' : 'Generate'}
+              </Button>
+            </div>
           </div>
         </div>
 

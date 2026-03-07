@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -119,7 +121,17 @@ export function OnboardingForm({ existing }: { existing: ProfileData | null }) {
     'rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none w-full'
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-6">
+    <div className="relative flex min-h-svh items-center justify-center p-6">
+      {existing && (
+        <Link
+          href="/app/prospects"
+          className="absolute left-6 top-6 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Back to prospects"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Link>
+      )}
       <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle className="text-2xl">
