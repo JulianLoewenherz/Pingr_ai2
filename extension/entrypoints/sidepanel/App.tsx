@@ -170,8 +170,13 @@ function MainPanel({ onLogout }: { onLogout: () => void }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<GenerateResult | null>(null)
+  const [editedText, setEditedText] = useState('')
   const [copied, setCopied] = useState(false)
   const [statusSent, setStatusSent] = useState(false)
+
+  useEffect(() => {
+    if (result) setEditedText(result.draft.draft_text)
+  }, [result])
 
   // Get the active tab URL whenever the panel mounts or gains focus
   function refreshTabUrl() {
@@ -215,8 +220,8 @@ function MainPanel({ onLogout }: { onLogout: () => void }) {
   }
 
   async function handleCopy() {
-    if (!result) return
-    await navigator.clipboard.writeText(result.draft.draft_text)
+    if (!result || !editedText) return
+    await navigator.clipboard.writeText(editedText)
     setCopied(true)
     await updateStatus(result.prospect.id, 'copied')
     setTimeout(() => setCopied(false), 2000)
@@ -292,8 +297,21 @@ function MainPanel({ onLogout }: { onLogout: () => void }) {
             {/* Draft */}
             <div>
               <p style={s.muted}>Generated message</p>
-              <div style={{ ...s.mono, marginTop: '6px' }}>{result.draft.draft_text}</div>
-              <p style={{ ...s.muted, marginTop: '4px' }}>{result.draft.draft_text.length} characters</p>
+              <textarea
+                value={editedText}
+                onChange={(e) => setEditedText(e.target.value)}
+                rows={6}
+                style={{
+                  ...s.mono,
+                  marginTop: '6px',
+                  width: '100%',
+                  boxSizing: 'border-box' as const,
+                  resize: 'vertical' as const,
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+              />
+              <p style={{ ...s.muted, marginTop: '4px' }}>{editedText.length} characters</p>
             </div>
 
             {/* Personalization note */}

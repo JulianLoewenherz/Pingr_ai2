@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,7 +29,12 @@ export function GenerateDraftForm({ onSuccess }: { onSuccess?: () => void }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<GenerateResult | null>(null)
+  const [editedText, setEditedText] = useState('')
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (result) setEditedText(result.draft.draft_text)
+  }, [result])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -63,11 +68,10 @@ export function GenerateDraftForm({ onSuccess }: { onSuccess?: () => void }) {
   }
 
   async function handleCopy() {
-    if (!result?.draft.draft_text) return
-    await navigator.clipboard.writeText(result.draft.draft_text)
+    if (!editedText || !result) return
+    await navigator.clipboard.writeText(editedText)
     setCopied(true)
 
-    // Update status to 'copied'
     await fetch('/api/prospects/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -164,11 +168,14 @@ export function GenerateDraftForm({ onSuccess }: { onSuccess?: () => void }) {
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">
               Generated message
             </p>
-            <div className="bg-muted/50 rounded-lg px-4 py-3 text-sm leading-relaxed">
-              {result.draft.draft_text}
-            </div>
+            <textarea
+              value={editedText}
+              onChange={(e) => setEditedText(e.target.value)}
+              rows={6}
+              className="w-full rounded-lg border bg-muted/50 px-4 py-3 text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+            />
             <p className="text-xs text-muted-foreground mt-1.5">
-              {result.draft.draft_text.length} characters
+              {editedText.length} characters
             </p>
           </div>
 
